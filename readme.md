@@ -15,5 +15,5 @@ This is mainly intended to be used by myself for myself. But others may find it 
                                      LSD module.
   [2] validate.h         ; simple utilities to enhance the validation /
                                      debugging of LSD models via macros (end of file)
-See validate.cpp for more information
+See validate.h for more information
 
