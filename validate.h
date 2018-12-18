@@ -1,18 +1,16 @@
 /*************************************************************
-  validate.cpp
-  Copyright: Frederik Schaff
-  Version: 1.1 (dec 2018)
-
-  Licence: MIT
-
-  usage: just include in your model file ("fun_XXX.cpp") header
-  before MODELBEGIN:
-
-  #include "validate.h"
-
-*************************************************************/
-
-/*
+* validate.h
+* Copyright: Frederik Schaff
+* Version: 1.11 (dec 2018)
+*
+* Licence: MIT
+*
+* usage: just include in your model file ("fun_XXX.cpp") header
+* before MODELBEGIN:
+*
+* #include "validate.h"
+*
+*
 * This file contains methods to allow printing the caller graph.
 * It is an additional toolset to the LSD Stack Printing possible in
 * online mode. In specific, it allows to print the sequence of actions
@@ -20,19 +18,105 @@
 * It makes use of the opportunity of LSD-GIS to provide unique IDs
 * to LSD objects, faciliating the validation / debuging.
 *
-* In non-CPP11 mode the pointer value will be printed as id instead.
+* For information on LSD see: https://github.com/marcov64/Lsd
 *
-* There are a few global variables that can be changed to control the printing
-* of the stack. See the description of the respective macros in the manual. To
-* enable the printing, you need to add the following define
-* to the fun_*.cpp file holding the model:
-*  #define TRACK_SEQUENCE
+* New set of Macros (all to be used within equations code):
+*
+*  - Macros to retrace the order in which actions are performed.
+*
+*    TRACK_SEQUENCE : If used, it prints information on the current variable
+*     and object. It is less powerfull than the LSD print stack option as it
+*     does not measure execution times. But it has other usefuls things. By
+*     using it when a function is called, not when the execution is finished,
+*     it is simpler to understand. Inaddition, it makes use of the unique IDs
+*     of unique objects, printing theIDs information. Thus it becomes more easy
+*     to see what exactly happens,especially together with user defined printing
+*     of information.TRACK_SEQUENCE will only trigger in the first
+*     TRACK_SEQUENCE_MAX_T times.
+*
+*    TRACK_SEQUENCE_ALWAYS : Same as TRACK_SEQUENCE, but it will always trigger
+*    .
+*    TRACK_SEQUENCE_FIRST_OR_LAST : It will only trigger for the first and last
+*     element of a brotherhood of objects.
+*
+*    TRACK_SEQUENCE_FIRST_OR_LAST_ALWAYS : triggers also after
+*     TRACK_SEQUENCE_MAX_T time steps.
+*
+*    TEQUATION : This is a simple way to include TRACK_SEQUENCE for all
+*     equations. You may use TRACK_SINGLE_TEQUATION_MAX_T to control when
+*     grouping occurs and individual information is not printed.
 *
 *
-* To change the number of steps tracked.
+*  - Macros for profiling. Whenever the argument check_true evaluates to true,
+*     information is printed.
+*   SET_LOCAL_CLOCK_X(check_true) : Set a new local clock in the current scope.
 *
-*/
+*   ADD_LOCAL_CLOCK_INFO(test)   : Add info to be printed with the clock
+*     information. The strings will be conactated.
+*
+*   ADD_LOCAL_CLOCK_TRACKSEQUENCE : Add special info: Adds the TRACK_SEQUENCE
+*     info to the clock.
+*
+*   REPORT_LOCAL_CLOCK_X(check_true) : Report the results of the Local Clock
+*     (time taken, Info text)
+*
+*   RESET_LOCAL_CLOCK_X(check_true) : Reset the local clock. If check_true
+*     evaluates true, information about the reset is printed
+*
+*  - Macros to switch on/off the execution of test-code sections or messages
+*
+*   TEST_MODE(check_true){ *user code section* }  : If check_true evaluates to
+*     true, the code instructions in the paranthesis are processed.
+*
+*   TEST_ELSE : basically just a "} else {" that allows to define clearly
+*     different testing conditions.
+*
+*   VERBOSE_MODE(check_true){ *user code section* }  : If check_true evaluates
+*     to true, the code instructions in the paranthesis are processed.
+*     Practically the same as the TEST_MODE, but with the aim to add info
+*     messages and not validation checks.
+*
+*
+* Switching Options:
+*  The following defines can be used before MODELLBEGIN
+*
+*  #define USE_GDB_DEBUG_GLOBAL
+*  **  This Option allows to set a watchpoint with GDB to the global variable
+*      GDB_DEBUG_GLOBAL. One may then use a loopcheck (one active at a time),
+*      see above
+*
+*  #define TRACK_SEQUENCE_MAX_T _steps_
+*  **  This Option allows to set a maximum number of _steps_ for the
+*   TRACK_SEQUENCE. The default is no maximum.
+*
+*  #define TRACK_SINGLE_TEQUATION_MAX_T _number_
+*  **  This Option allows to define a maximum number of objects in a
+*   brother-hood chain for which individual information is printed in
+*   TEQUATION mode. The default is 50
+*
+*  #define NO_WINDOW_TRACKING
+*  **  This Option activates the validation macros in NO_WINDOW mode, where they
+*     are otherwise disabled.
+*
+*  #define DISABLE_LOCAL_CLOCKS
+*  **  Disables the local clocks set, see above
+*
+*  #define SWITCH_TEST_OFF
+*  **  Switch off the conditional tests, see above
+*
+*  #define SWITCH_VERBOSE_OFF
+*  **  Switch off the verbose mode, see above
+*
+*
+*************************************************************/
 
+#if !defined( LSD_GIS )
+//   #error The LSD validate module is intended to work with LSD_GIS by Frederik Schaff.
+#endif
+
+#define LSD_MODULE_VALIDATE 1.1
+
+#include <ctime>
 #include <string>
 
 
@@ -40,9 +124,13 @@
   #define TRACK_SEQUENCE_MAX_T max_step
 #endif
 
+#ifndef TRACK_SINGLE_TEQUATION_MAX_T
+  #define TRACK_SINGLE_TEQUATION_MAX_T 50
+#endif
+
 #define USE_OLD_ID_LABEL_PATTERN false //a switch to allow the name pattern ID_Label instead of default Label_ID
-#define MAX_ID 99999
-#define ID_CHAR_BUFF 6 //decimals in MAX_ID +1
+#define MAX_ID 999999999
+#define ID_CHAR_BUFF 10 //decimals in MAX_ID +1
 
 namespace LSD_VALIDATE {
 
@@ -102,13 +190,6 @@ namespace LSD_VALIDATE {
   std::string current_callee_type;
 
   std::string track_source(object* p, object* c=NULL, variable* var=NULL, bool has_id=true){
-  //   if (init_former_callee < 0 && (former_caller_obj=!c || former_callee_obj->next != p){
-  //     init_former_callee=0;
-  //     former_caller_obj=c;
-  //     former_callee_obj=p;//(re)initialise
-  //   } else {
-  //     init_former_callee++;
-  //   }
 
     //those objects without id are only reported if the are first and/or last.
     std::string first_last_add = "";
@@ -121,7 +202,6 @@ namespace LSD_VALIDATE {
       }
 
       //next, find first object of that kind and check if it is p.
-//       object* first = NULL;
       if (p!= root){
         bridge* cb = p->up->b;
         while (cb != NULL && strcmp(cb->head->label,p->label)!=0 ){ //if there is a cb->head and (only then) if this is not of the same type as p
@@ -197,8 +277,7 @@ namespace LSD_VALIDATE {
 #undef MAX_ID
 
 /*** Following: a set of macros as API */
-#include <ctime>
-#include <string>
+
 
 //in no window mode, stop all information printing
 #ifndef NO_WINDOW_TRACKING
@@ -335,20 +414,6 @@ namespace LSD_VALIDATE {
   #define VERBOSE_MODE(X) if (false && X) //Verbose off
 #endif
 
-/* A macro to save the stats withour updating */
-#ifndef ABMAT_USE_ANALYSIS
-  #define ABORT_STATS
-#else
-  #define ABORT_STATS V_CHEAT("ABMAT_UPDATE",NULL);
-#endif
-
-/* A more severe ABORT, that also stops the computation of the
-  current EQUATION but not the subsequent simulations*/
-#define ABORT2 \
-        ABORT_STATS \
-        quit = 1;       \
-        END_EQUATION(0.0) //prematurely end the current equation
-
 /* Tracking of equations etc., special tracking of objects with "_ID" or "ID".*/
 
 #ifndef SWITCH_TRACK_SEQUENCE_OFF
@@ -371,6 +436,14 @@ namespace LSD_VALIDATE {
   #define TRACK_SEQUENCE_INFO void();
 #endif
 
-#define TEQUATION( X ) \
-  EQUATION( X ) \
-  TRACK_SEQUENCE
+#ifdef SWITCH_TRACK_SEQUENCE_OFF
+  #define TEQUATION ( X ) EQUATION ( X )
+#else
+  #define TEQUATION( X ) \
+    EQUATION( X ) \
+    if COUNT(p->label) > TRACK_SINGLE_TEQUATION_MAX_T { \
+      TRACK_SEQUENCE_FIRST_OR_LAST  \
+    } else {           \
+      TRACK_SEQUENCE \
+    }
+#endif
