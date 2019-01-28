@@ -444,7 +444,7 @@ bool GDB_DEBUG_GLOBAL = false; //use in gdb: watch GDB_DEBUG_GLOBAL
 #endif
 
 #ifdef SWITCH_TRACK_SEQUENCE_OFF
-#define TEQUATION ( X ) EQUATION ( X )
+#define TEQUATION( X ) EQUATION( X )
 #else
 #define TEQUATION( X ) \
     EQUATION( X ) \
