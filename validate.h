@@ -313,7 +313,7 @@ bool GDB_DEBUG_GLOBAL = false; //use in gdb: watch GDB_DEBUG_GLOBAL
 //to do: measure time instead
 #define SET_LOOP_CHECK int GDB_DEBUG_LOOP_CHECK = 0;
 #define RESET_LOOP_CHECK GDB_DEBUG_LOOP_CHECK = 0;
-#define CHECK_LOOP_CHECK     if (GDB_DEBUG_LOOP_CHECK++ > 100000) { GDB_DEBUG_GLOBAL=!GDB_DEBUG_GLOBAL; PLOG("\nERROR: Very slow process!"); }
+#define CHECK_LOOP_CHECK     if (GDB_DEBUG_LOOP_CHECK++ > 100000) { GDB_DEBUG_GLOBAL=!GDB_DEBUG_GLOBAL; LOG("\nERROR: Very slow process!"); }
 #else
 #define SET_LOOP_CHECK
 #define RESET_LOOP_CHECK
@@ -341,7 +341,7 @@ bool GDB_DEBUG_GLOBAL = false; //use in gdb: watch GDB_DEBUG_GLOBAL
     clock_gettime(CLOCK_MONOTONIC, &local_start); \
     int local_clock_id = int(local_start.tv_sec);\
     if (REPORT_LOCAL_CLOCK_DirectPrint) { \
-      PLOG("\n\tCLOCK Setting clock with ID %i",local_clock_id); \
+      LOG("\n\tCLOCK Setting clock with ID %i",local_clock_id); \
     } else { \
       REPORT_LOCAL_CLOCK_report+="\n\tCLOCK Setting clock with ID " + std::to_string(local_clock_id); \
     }
@@ -353,7 +353,7 @@ bool GDB_DEBUG_GLOBAL = false; //use in gdb: watch GDB_DEBUG_GLOBAL
     clock_gettime(CLOCK_MONOTONIC, &local_start);\
     local_clock_id = int(local_start.tv_sec);\
     if(REPORT_LOCAL_CLOCK_DirectPrint) {\
-      PLOG("\n\tCLOCK Re-setting clock with new ID %i",local_clock_id);\
+      LOG("\n\tCLOCK Re-setting clock with new ID %i",local_clock_id);\
     } else { \
       REPORT_LOCAL_CLOCK_report+="\n\tCLOCK Re-setting clock with new ID " + std::to_string(local_clock_id); \
     }
@@ -365,16 +365,16 @@ bool GDB_DEBUG_GLOBAL = false; //use in gdb: watch GDB_DEBUG_GLOBAL
              elapsed += (local_finish.tv_nsec - local_start.tv_nsec) / 1000000000.0;\
       if (double(mintime)<elapsed){\
         if (!REPORT_LOCAL_CLOCK_DirectPrint){ \
-          PLOG("%s",REPORT_LOCAL_CLOCK_report.c_str()); \
+          LOG("%s",REPORT_LOCAL_CLOCK_report.c_str()); \
         } \
-          PLOG("\n\tCLOCK Local clock with ID %i: Seconds elapsed: %g",local_clock_id,elapsed);\
+          LOG("\n\tCLOCK Local clock with ID %i: Seconds elapsed: %g",local_clock_id,elapsed);\
       }\
     }
 
 
 #define ADD_LOCAL_CLOCK_INFO(text) \
     if (REPORT_LOCAL_CLOCK_DirectPrint){ \
-      PLOG(text); \
+      LOG(text); \
     } else {    \
       REPORT_LOCAL_CLOCK_report += string(text);  \
     }
@@ -427,13 +427,13 @@ bool GDB_DEBUG_GLOBAL = false; //use in gdb: watch GDB_DEBUG_GLOBAL
 
 //   #undef TRACK_SEQUENCE
 #define TRACK_SEQUENCE \
-  if ( t <= TRACK_SEQUENCE_MAX_T)  { PLOG(LSD_VALIDATE::track_sequence(t,p,c,var).c_str()); };
+  if ( !fast && t <= TRACK_SEQUENCE_MAX_T)  { LOG(LSD_VALIDATE::track_sequence(t,p,c,var).c_str()); };
 //   #undef TRACK_SEQUENCE_FIRST_OR_LAST
 #define TRACK_SEQUENCE_FIRST_OR_LAST \
-    if ( t <= TRACK_SEQUENCE_MAX_T )  { PLOG(LSD_VALIDATE::track_sequence(t,p,c,var,false).c_str()); };
+    if ( !fast && t <= TRACK_SEQUENCE_MAX_T )  { LOG(LSD_VALIDATE::track_sequence(t,p,c,var,false).c_str()); };
 #define TRACK_SEQUENCE_FIRST_OR_LAST_ALWAYS \
-    PLOG(LSD_VALIDATE::track_sequence(t,p,c,var,false).c_str());
-#define TRACK_SEQUENCE_ALWAYS { PLOG(LSD_VALIDATE::track_sequence(t,p,c,var).c_str()); };
+    LOG(LSD_VALIDATE::track_sequence(t,p,c,var,false).c_str());
+#define TRACK_SEQUENCE_ALWAYS { LOG(LSD_VALIDATE::track_sequence(t,p,c,var).c_str()); };
 #define TRACK_SEQUENCE_INFO  LSD_VALIDATE::track_sequence(t,p,c,var).c_str()
 #else
 #define TRACK_SEQUENCE  void();
