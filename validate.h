@@ -11,14 +11,18 @@
     #include "validate.h"
 
 
+    Commenting is not good yet...
+
     This file contains methods to allow printing the caller graph.
     It is an additional toolset to the LSD Stack Printing possible in
     online mode. In specific, it allows to print the sequence of actions
     and some information of who called whom.
     It makes use of the opportunity of LSD-GIS to provide unique IDs
-    to LSD objects, faciliating the validation / debuging.
+    to LSD objects, faciliating the validation / debuging.      
 
-    For information on LSD see: https://github.com/marcov64/Lsd
+    TEQUATION
+     For a fast testing/logging, exchange all EQUATION with TEQUATION.
+
 
     New set of Macros (all to be used within equations code):
 
@@ -33,18 +37,15 @@
       to see what exactly happens,especially together with user defined printing
       of information.TRACK_SEQUENCE will only trigger in the first
       TRACK_SEQUENCE_MAX_T times.
-
-     TRACK_SEQUENCE_ALWAYS : Same as TRACK_SEQUENCE, but it will always trigger
+      
+     SWITCH_TRACK_SEQUENCE_ALL : If defined before MODELLBEGIN information for all 
+      variables will be printed whenever they are updated, as long as t <= TRACK_SINGLE_TEQUATION_MAX_T     
      .
      TRACK_SEQUENCE_FIRST_OR_LAST : It will only trigger for the first and last
       element of a brotherhood of objects.
 
      TRACK_SEQUENCE_FIRST_OR_LAST_ALWAYS : triggers also after
       TRACK_SEQUENCE_MAX_T time steps.
-
-     TEQUATION : This is a simple way to include TRACK_SEQUENCE for all
-      equations. You may use TRACK_SINGLE_TEQUATION_MAX_T to control when
-      grouping occurs and individual information is not printed.
 
 
     - Macros for profiling. Whenever the argument check_true evaluates to true,
@@ -80,10 +81,8 @@
     Switching Options:
     The following defines can be used before MODELLBEGIN
 
-    #define USE_GDB_DEBUG_GLOBAL
-*  **  This Option allows to set a watchpoint with GDB to the global variable
-       GDB_DEBUG_GLOBAL. One may then use a loopcheck (one active at a time),
-       see above
+    #define USE_ASSERTS
+*  **  This Option allows to trigger asserts if a specific time
 
     #define TRACK_SEQUENCE_MAX_T _steps_
 *  **  This Option allows to set a maximum number of _steps_ for the
@@ -110,18 +109,12 @@
 
 *************************************************************/
 
-#if !defined( LSD_GIS )
-//   #error The LSD validate module is intended to work with LSD_GIS by Frederik Schaff.
-#endif
-
-#define LSD_MODULE_VALIDATE 1.1
-
-#include <ctime>
+#include <time.h>
 #include <string>
 #include <sstream>
 #include <iostream>
 #include <iomanip>
-
+#include <assert.h>
 
 #ifndef TRACK_SEQUENCE_MAX_T
 #define TRACK_SEQUENCE_MAX_T max_step
@@ -134,6 +127,30 @@
 #define USE_OLD_ID_LABEL_PATTERN false //a switch to allow the name pattern ID_Label instead of default Label_ID
 
 namespace LSD_VALIDATE {
+    struct s_assert_time;
+
+    struct s_assert_time {
+        double time; //allowed time
+        timespec t_start;
+        timespec t_end;
+
+        s_assert_time( double time ) : time(time)
+        {
+            clock_gettime(CLOCK_MONOTONIC, &t_start);
+        };
+
+        bool operator()( )
+        {
+            clock_gettime(CLOCK_MONOTONIC, &t_end);
+            double elapsed = ( (double) (t_end.tv_sec - t_start.tv_sec) ) + ( (double) (t_end.tv_nsec - t_start.tv_nsec) ) / 10.0e9;
+            if (elapsed > time){
+                plog("\nError in s_assert_time()");
+                return false;
+            }
+            else
+                return true;
+        };
+    };
 
     //   static bool dummy_has_id;
     //label_id_of_o
@@ -285,15 +302,14 @@ namespace LSD_VALIDATE {
 
 /*** Following: a set of macros as API */
 
-
-//in no window mode, stop all information printing
+//in no window mode, stop all information printing and testing
 #ifndef NO_WINDOW_TRACKING
 #ifdef NO_WINDOW
 #ifndef DISABLE_LOCAL_CLOCKS
 #define DISABLE_LOCAL_CLOCKS
 #endif
-#ifdef USE_GDB_DEBUG_GLOBAL
-#undef USE_GDB_DEBUG_GLOBAL
+#ifdef USE_ASSERTS
+#undef USE_ASSERTS
 #endif
 #ifndef SWITCH_TRACK_SEQUENCE_OFF
 #define SWITCH_TRACK_SEQUENCE_OFF
@@ -307,17 +323,17 @@ namespace LSD_VALIDATE {
 #endif
 #endif
 
-
-#ifdef USE_GDB_DEBUG_GLOBAL
-bool GDB_DEBUG_GLOBAL = false; //use in gdb: watch GDB_DEBUG_GLOBAL
-//to do: measure time instead
-#define SET_LOOP_CHECK int GDB_DEBUG_LOOP_CHECK = 0;
-#define RESET_LOOP_CHECK GDB_DEBUG_LOOP_CHECK = 0;
-#define CHECK_LOOP_CHECK     if (GDB_DEBUG_LOOP_CHECK++ > 100000) { GDB_DEBUG_GLOBAL=!GDB_DEBUG_GLOBAL; LOG("\nERROR: Very slow process!"); }
+/* Tools for assertions */
+#ifdef USE_ASSERTS
+#define SET_TIME_CHECK( TIME ) LSD_VALIDATE::s_assert_time assert_time( TIME );  plog("\nSet Time Check");
+#define RESET_TIME_CHECK       assert_time = LSD_VALIDATE::s_assert_time(assert_time.time);
+#define ASSERT_TIME_CHECK      assert( assert_time( ) );
+#define ASSERT_EXPRESSION( EXPR )      assert( EXPR );
 #else
-#define SET_LOOP_CHECK
-#define RESET_LOOP_CHECK
-#define CHECK_LOOP_CHECK
+#define SET_TIME_CHECK( TIME ) void( TIME );
+#define RESET_TIME_CHECK
+#define ASSERT_TIME_CHECK
+#define ASSERT_EXPRESSION( EXPR ) void( EXPR );
 #endif
 
 // To get time info, see   http://stackoverflow.com/a/2962914/3895476
@@ -380,7 +396,7 @@ bool GDB_DEBUG_GLOBAL = false; //use in gdb: watch GDB_DEBUG_GLOBAL
     }
 
 #define ADD_LOCAL_CLOCK_TRACKSEQUENCE \
-      REPORT_LOCAL_CLOCK_report += TRACK_SEQUENCE_INFO;
+      REPORT_LOCAL_CLOCK_report += LSD_VALIDATE::track_sequence(t,p,c,var);
 
 #endif  //defined DISABLE_LOCAL_CLOCKS end
 
@@ -443,9 +459,7 @@ bool GDB_DEBUG_GLOBAL = false; //use in gdb: watch GDB_DEBUG_GLOBAL
 #define TRACK_SEQUENCE_INFO void();
 #endif
 
-#ifdef SWITCH_TRACK_SEQUENCE_OFF
-#define TEQUATION( X ) EQUATION( X )
-#else
+#ifdef SWITCH_TRACK_SEQUENCE_ALL
 #define TEQUATION( X ) \
     EQUATION( X ) \
     if ( COUNT(p->label) > TRACK_SINGLE_TEQUATION_MAX_T) { \
@@ -453,4 +467,6 @@ bool GDB_DEBUG_GLOBAL = false; //use in gdb: watch GDB_DEBUG_GLOBAL
     } else {           \
       TRACK_SEQUENCE \
     }
+#else
+#define TEQUATION EQUATION( X )
 #endif
