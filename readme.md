@@ -1,4 +1,6 @@
-https://github.com/FrederikSchaff/lsd_debug-tools                                                                                           Dec 2018
+[![DOI](https://zenodo.org/badge/162153844.svg)](https://zenodo.org/badge/latestdoi/162153844)
+
+Dec 2018
   LSD Debug module - backend for LSD (LSD-GIS)
   written by Frederik Schaff, Ruhr-University Bochum
 
